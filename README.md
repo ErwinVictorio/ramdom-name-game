@@ -52,3 +52,7 @@ Browser tests use installed Google Chrome and start Vite automatically if needed
 The ranking is generated once at Start Game. Later animation changes only cup positions, never the ranking. Replay is an independent random draw and may legitimately produce the same order.
 
 The supplied drum roll plays once before any cup opens. Confirmed reset stops playback; replay starts a fresh full roll. If audio is blocked, fails, or stalls, a message appears and reveals continue silently. Saved groups, history, and exports remain future enhancements.
+
+### Mobile audio
+
+Audio is activated through Web Audio in the Start Game / Play Again tap handler, then played after the shuffle. Browser tests cover touch input, user-gesture enforcement, and nonzero output samples; actual phone speaker output requires a device retest. After changing the source, deploy a fresh build to Vercel before testing the public URL.

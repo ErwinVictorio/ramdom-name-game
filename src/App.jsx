@@ -15,6 +15,7 @@ import { motion as Motion } from "motion/react";
 import Cup from "./components/Cup";
 import ResetDialog from "./components/ResetDialog";
 import { useGame } from "./hooks/useGame";
+import { useCompletionConfetti } from "./hooks/useCompletionConfetti";
 import { parseNames, validateGame } from "./utils/game";
 import closedCup from "./assets/images/cup_close.png";
 import openCup from "./assets/images/cup_opne.png";
@@ -33,6 +34,7 @@ function App() {
   const phase = game.phase === "setup" && !error ? "ready" : game.phase;
   const busy = ["shuffling", "stopping", "drumroll", "revealing"].includes(phase);
   const finished = phase === "finished";
+  useCompletionConfetti(finished);
   const count = game.order.length || names.length;
   const display = game.order.length
     ? game.display

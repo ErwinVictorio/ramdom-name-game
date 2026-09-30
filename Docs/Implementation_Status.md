@@ -26,3 +26,23 @@ The original assets remain unchanged. `.tools/` contains ignored local tooling b
 Audio playback state and reveal timing were verified in Chrome. Manual listening and physical mobile-device speaker output remain unverified.
 
 Latest adjustment verified: the entire drum roll plays once before any cups open. All 7 browser tests, 3 unit tests, lint, and build pass with this behavior; subsequent openings remain 3 seconds apart.
+
+## Mobile audio fix
+
+The reported issue is sound missing on mobile Chrome while shuffle and reveal still work. The previous muted-media preparation was replaced with Web Audio: Start Game / Play Again synchronously creates or resumes an AudioContext inside the click/tap handler, and fetches/decodes the supplied MP3 during the shuffle. A non-looping buffer source plays the whole clip afterward; its ended event starts the reveals. The 3-second reveal interval remains unchanged.
+
+Reset/unmount stops and disconnects the active source and invalidates pending playback callbacks. Loading, decoding, blocked audio, and stalled context handling retain the visible failure notice and silent completion behavior.
+
+Validation: 4 unit tests and 7 Chrome browser tests pass, along with ESLint and the production build. The audio test uses touch input and rejects context resumes outside a user gesture. It measures nonzero audio samples in the output graph, verifies full playback before reveals, and covers replay/reset. This is browser emulation, not verification of a physical phone's speakers.
+
+### Live deployment check
+
+The public site https://ramdom-name-game.vercel.app/ returned HTTP 200 and served `/assets/index-Dn3AXzvJ.js`. That bundle contains the old muted preparation and no `decodeAudioData` implementation. The verified local build produces `/assets/index-2QAbVfvD.js`.
+
+The fix is local and is not deployed. Publish the updated source through the project's existing Vercel deployment workflow (Vite build command `npm run build`, output directory `dist`). If Vercel is connected to the GitHub production branch, pushing the reviewed changes to that branch should trigger the configured deployment. After deployment, confirm the new bundle is live and reload the site on the phone before retesting Start Game.
+
+## Completion confetti
+
+Installed `canvas-confetti` and added `useCompletionConfetti`. A single colorful burst fires 600 ms after the final reveal, allowing the cup-opening transition to finish. Mobile uses fewer particles. Replay/reset/unmount cancel the pending burst and clear existing confetti. Reduced-motion preferences disable the effect.
+
+Validation: production build, lint, 4 unit tests, and 2 focused browser tests pass. Browser checks cover no confetti before the final reveal, rendered particles, replay, cleanup, no repeat on dialog cancellation, and reduced motion. Screenshot reviewed at `test-results/confetti.png`. These changes have not been deployed.

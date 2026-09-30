@@ -27,3 +27,11 @@ Asset: `src/assets/Sound/Drum roll sound effect.mp3` (approximately 8.94 seconds
 Passed: production build, ESLint, 3 unit tests, and 7 Chrome browser tests. Actual playback continued beyond 3 seconds and reached the media `ended` event before the first reveal. Only one audible playback occurred in the completed game. Replay, reset during playback, stale completion callbacks, blocked/missing audio, and the 12-participant mobile flow passed.
 
 Manual listening and physical-device speaker output are not assessed.
+
+## Mobile audio implementation update
+
+Replaced muted HTML audio preparation with Web Audio. The context is created/resumed synchronously from Start Game / Play Again, and the MP3 is decoded during shuffle. A single non-looping source plays the full clip before reveals. Reset and unmount invalidate callbacks and disconnect playback.
+
+Latest validation: 4 unit tests, 7 browser tests, lint, and production build pass. Tests include touch activation, user-gesture enforcement, measured audio samples, complete clip timing, and reset/replay. Physical-phone speaker output is still unverified.
+
+Live Vercel inspection confirms the old `index-Dn3AXzvJ.js` bundle remains deployed. The local fix builds `index-2QAbVfvD.js`; deployment and a phone retest are required.

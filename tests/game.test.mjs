@@ -1,55 +1,123 @@
-import test from "node:test";
+﻿import test from "node:test";
 import assert from "node:assert/strict";
 import { parseNames, shuffleArray, validateGame } from "../src/utils/game.js";
 import { createDrumRoll } from "../src/utils/drumRoll.js";
 
-test("audio cleanup ignores stale preparation and late playback failures", async () => {
-  const original = globalThis.Audio;
-  const requests = [];
-  let media;
-  let failures = 0;
-  let completions = 0;
-  globalThis.Audio = class {
+async function withAudio(run) {
+  const originalContext = globalThis.AudioContext;
+  const originalFetch = globalThis.fetch;
+  const nodes = [];
+  let context;
+  globalThis.AudioContext = class {
+    state = "running";
+    currentTime = 0;
+    destination = {};
     constructor() {
-      media = this;
+      context = this;
     }
-    pause() {
-      this.paused = true;
+    resume() {
+      this.resumed = true;
+      return Promise.resolve();
     }
-    play() {
-      this.paused = false;
-      return new Promise((resolve, reject) =>
-        requests.push({ resolve, reject }),
-      );
+    decodeAudioData() {
+      return Promise.resolve({ duration: 9 });
+    }
+    close() {
+      this.state = "closed";
+      return Promise.resolve();
+    }
+    createBufferSource() {
+      const node = {
+        start() {
+          this.started = true;
+        },
+        stop() {
+          this.stopped = true;
+        },
+        connect() {},
+        disconnect() {
+          this.disconnected = true;
+        },
+      };
+      nodes.push(node);
+      return node;
     }
   };
+  globalThis.fetch = async () => ({
+    ok: true,
+    arrayBuffer: async () => new ArrayBuffer(1),
+  });
   try {
-    const player = createDrumRoll("drum.mp3", () => failures++);
-    player.prepare();
-    assert.equal(media.muted, true);
-    player.play(() => completions++);
-    const staleEnded = media.onended;
-    requests[0].resolve();
-    await Promise.resolve();
-    assert.equal(media.paused, false);
-    assert.equal(media.muted, false);
-    assert.equal(media.loop, false);
-    player.dispose();
-    staleEnded();
-    requests[1].reject(new Error("late rejection after unmount"));
-    await Promise.resolve();
-    await Promise.resolve();
-    assert.equal(media.paused, true);
-    assert.equal(media.currentTime, 0);
-    assert.equal(media.onerror, null);
-    assert.equal(failures, 0);
-    assert.equal(completions, 0);
+    await run({ nodes, getContext: () => context });
   } finally {
-    if (original === undefined) delete globalThis.Audio;
-    else globalThis.Audio = original;
+    if (originalContext === undefined) delete globalThis.AudioContext;
+    else globalThis.AudioContext = originalContext;
+    globalThis.fetch = originalFetch;
   }
+}
+const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+test("resumes synchronously, plays once, and ignores stale ended events after reset", async () => {
+  await withAudio(async ({ nodes, getContext }) => {
+    let completed = 0;
+    const player = createDrumRoll("drum.mp3", () =>
+      assert.fail("unexpected failure"),
+    );
+    try {
+      player.prepare();
+      assert.equal(getContext().resumed, true);
+      await flush();
+      assert.equal(nodes.length, 0);
+      player.play(() => completed++);
+      await flush();
+      assert.equal(nodes.length, 1);
+      assert.equal(nodes[0].loop, false);
+      const ended = nodes[0].onended;
+      ended();
+      ended();
+      assert.equal(completed, 1);
+      player.prepare();
+      await flush();
+      player.play(() => completed++);
+      await flush();
+      const staleEnded = nodes[1].onended;
+      player.stop();
+      staleEnded();
+      assert.equal(completed, 1);
+      assert.equal(nodes[1].stopped, true);
+      assert.equal(nodes[1].disconnected, true);
+    } finally {
+      player.dispose();
+    }
+    assert.equal(getContext().state, "closed");
+  });
 });
 
+test("reset while decoding prevents delayed playback or reveals", async () => {
+  await withAudio(async ({ nodes, getContext }) => {
+    let resolveDecode;
+    let completed = 0;
+    const player = createDrumRoll("drum.mp3", () =>
+      assert.fail("unexpected failure"),
+    );
+    try {
+      player.prepare();
+      getContext().decodeAudioData = () =>
+        new Promise((resolve) => {
+          resolveDecode = resolve;
+        });
+      await flush();
+      player.play(() => completed++);
+      player.stop();
+      resolveDecode({ duration: 9 });
+      await flush();
+      assert.equal(nodes.length, 0);
+      assert.equal(completed, 0);
+    } finally {
+      player.dispose();
+    }
+  });
+});
 test("normalizes whitespace and rejects equivalent names", () => {
   const names = parseNames("  Ana   Cruz \r\n\n Bob\tReyes \nana cruz");
   assert.deepEqual(names, ["Ana Cruz", "Bob Reyes", "ana cruz"]);

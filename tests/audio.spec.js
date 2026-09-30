@@ -1,26 +1,62 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect } from "@playwright/test";
+
+test.use({
+  viewport: { width: 390, height: 844 },
+  hasTouch: true,
+  isMobile: true,
+});
 
 async function observeAudio(page, blocked = false) {
   await page.addInitScript((blocked) => {
-    const NativeAudio = window.Audio;
-    window.gameAudio = [];
-    window.audiblePlays = 0;
-    window.audioEndedAt = 0;
-    window.Audio = function (...args) {
-      const audio = new NativeAudio(...args);
-      window.gameAudio.push(audio);
-      const nativePlay = audio.play.bind(audio);
-      audio.play = () => {
-        if (!audio.muted) window.audiblePlays++;
-        return nativePlay();
-      };
-      audio.addEventListener("ended", () => {
-        window.audioEndedAt = performance.now();
-      });
-      if (blocked)
-        audio.play = () =>
-          Promise.reject(new DOMException("Blocked", "NotAllowedError"));
-      return audio;
+    const NativeContext = window.AudioContext;
+    window.audioContexts = [];
+    window.audioPlays = [];
+    window.resumeGestures = [];
+    window.AudioContext = class extends NativeContext {
+      constructor(...args) {
+        super(...args);
+        window.audioContexts.push(this);
+      }
+      resume() {
+        const active = navigator.userActivation.isActive;
+        window.resumeGestures.push(active);
+        if (blocked || !active)
+          return Promise.reject(
+            new DOMException("Requires a tap", "NotAllowedError"),
+          );
+        return super.resume();
+      }
+      createBufferSource() {
+        const source = super.createBufferSource();
+        const record = {
+          source,
+          context: this,
+          endedAt: 0,
+          stopped: false,
+          startedAt: 0,
+        };
+        const start = source.start.bind(source);
+        const stop = source.stop.bind(source);
+        source.start = (...args) => {
+          record.startedAt = performance.now();
+          window.audioPlays.push(record);
+          return start(...args);
+        };
+        source.stop = (...args) => {
+          record.stopped = true;
+          return stop(...args);
+        };
+        source.addEventListener("ended", () => {
+          record.endedAt = performance.now();
+        });
+        const connect = source.connect.bind(source);
+        source.connect = (destination) => {
+          record.analyser = this.createAnalyser();
+          record.analyser.connect(destination);
+          return connect(record.analyser);
+        };
+        return source;
+      }
     };
     window.revealTimes = [];
     new MutationObserver(() => {
@@ -31,37 +67,33 @@ async function observeAudio(page, blocked = false) {
   }, blocked);
 }
 
-test("one full drum roll ends before reveals; replay and reset clean up audio", async ({
+test("touch activation plays one full audible clip before reveals; replay and reset work", async ({
   page,
 }) => {
   await observeAudio(page);
   await page.goto("/");
   await page.getByLabel("Names List").fill("Ana\nBob");
   await page.getByLabel("Timer Settings").fill("3");
-  await page.getByRole("button", { name: "Start Game" }).click();
-  await expect
-    .poll(() => page.evaluate(() => window.gameAudio[0]?.paused))
-    .toBe(true);
+  await page.getByRole("button", { name: "Start Game" }).tap();
+  expect(await page.evaluate(() => window.resumeGestures)).toEqual([true]);
+  expect(await page.evaluate(() => window.audioPlays.length)).toBe(0);
   await expect(page.locator(".game-status")).toContainText("Drum roll", {
     timeout: 8000,
   });
   await expect(page.getByLabel("Names List")).toBeDisabled();
-  await expect(page.getByLabel("Timer Settings")).toBeDisabled();
   await expect(page.locator(".result-grid strong")).toHaveCount(0);
   await expect
     .poll(() =>
       page.evaluate(() => {
-        const audio = window.gameAudio[0];
-        return !audio.paused && !audio.muted && audio.currentTime > 0;
+        const record = window.audioPlays[0];
+        if (!record) return 0;
+        const samples = new Float32Array(record.analyser.fftSize);
+        record.analyser.getFloatTimeDomainData(samples);
+        return Math.max(...samples.map(Math.abs));
       }),
     )
-    .toBe(true);
-  // The previous behavior cut the sound at three seconds; it must now keep playing.
-  await expect
-    .poll(() => page.evaluate(() => window.gameAudio[0].currentTime), {
-      timeout: 6000,
-    })
-    .toBeGreaterThan(3.2);
+    .toBeGreaterThan(0.001);
+  await page.waitForTimeout(3300);
   await expect(page.locator(".result-grid strong")).toHaveCount(0);
   await expect(
     page.getByText("Sound unavailable.", { exact: false }),
@@ -70,52 +102,50 @@ test("one full drum roll ends before reveals; replay and reset clean up audio", 
     timeout: 10000,
   });
   const playback = await page.evaluate(() => ({
-    endedAt: window.audioEndedAt,
+    endedAt: window.audioPlays[0].endedAt,
+    startedAt: window.audioPlays[0].startedAt,
+    duration: window.audioPlays[0].source.buffer.duration,
     firstReveal: window.revealTimes[0],
-    plays: window.audiblePlays,
-    loop: window.gameAudio[0].loop,
+    plays: window.audioPlays.length,
+    loop: window.audioPlays[0].source.loop,
   }));
-  expect(playback.endedAt).toBeGreaterThan(0);
+  expect(playback.endedAt - playback.startedAt).toBeGreaterThan(
+    playback.duration * 1000 - 300,
+  );
   expect(playback.firstReveal).toBeGreaterThanOrEqual(playback.endedAt);
   expect(playback.plays).toBe(1);
   expect(playback.loop).toBe(false);
   await expect(page.locator(".result-grid strong")).toHaveCount(2, {
     timeout: 5000,
   });
-  expect(await page.evaluate(() => window.audiblePlays)).toBe(1);
+  expect(await page.evaluate(() => window.audioPlays.length)).toBe(1);
   const interval = await page.evaluate(
     () => window.revealTimes[1] - window.revealTimes[0],
   );
   expect(interval).toBeGreaterThanOrEqual(2900);
   expect(interval).toBeLessThan(3500);
+  await page.getByRole("button", { name: "Play Again" }).tap();
   await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          window.gameAudio[0].paused && window.gameAudio[0].currentTime === 0,
-      ),
-    )
-    .toBe(true);
-  await page.getByRole("button", { name: "Play Again" }).click();
-  await expect(page.locator(".game-status")).toContainText("Drum roll", {
-    timeout: 8000,
-  });
-  await expect
-    .poll(() => page.evaluate(() => !window.gameAudio[0].paused))
-    .toBe(true);
-  expect(await page.evaluate(() => window.gameAudio.length)).toBe(1);
+    .poll(() => page.evaluate(() => window.audioPlays.length), {
+      timeout: 8000,
+    })
+    .toBe(2);
+  expect(await page.evaluate(() => window.audioContexts.length)).toBe(1);
+  expect(await page.evaluate(() => window.resumeGestures)).toEqual([
+    true,
+    true,
+  ]);
   await page.getByRole("button", { name: "Reset Game", exact: true }).click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  expect(await page.evaluate(() => window.gameAudio[0].paused)).toBe(false);
+  expect(await page.evaluate(() => window.audioPlays[1].stopped)).toBe(false);
   await page.getByRole("button", { name: "Reset Game", exact: true }).click();
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Reset Game" })
     .click();
-  expect(await page.evaluate(() => window.gameAudio[0].paused)).toBe(true);
-  // Even a stale media event after reset cannot open a cup.
+  expect(await page.evaluate(() => window.audioPlays[1].stopped)).toBe(true);
   await page.evaluate(() =>
-    window.gameAudio[0].dispatchEvent(new Event("ended")),
+    window.audioPlays[1].source.dispatchEvent(new Event("ended")),
   );
   await page.waitForTimeout(9500);
   await expect(page.locator(".result-grid strong")).toHaveCount(0);
@@ -129,7 +159,7 @@ for (const failure of ["blocked", "missing"]) {
     await page.goto("/");
     await page.getByLabel("Names List").fill("Ana\nBob");
     await page.getByLabel("Timer Settings").fill("3");
-    await page.getByRole("button", { name: "Start Game" }).click();
+    await page.getByRole("button", { name: "Start Game" }).tap();
     await expect(
       page.getByText("Sound unavailable.", { exact: false }),
     ).toBeVisible();
