@@ -15,7 +15,7 @@ test("confetti follows the last reveal, runs once, and resets on replay", async 
   await page.clock.runFor(6000);
   await expect(page.locator(".result-grid strong")).toHaveCount(1);
   await expect(page.locator("canvas")).toHaveCount(0);
-  await page.clock.runFor(3000);
+  await page.clock.runFor(5000);
   await expect(page.locator(".cups-grid .is-open")).toHaveCount(2);
   await page.clock.runFor(700);
   await expect(page.locator("canvas")).toHaveCount(1);
@@ -26,7 +26,7 @@ test("confetti follows the last reveal, runs once, and resets on replay", async 
   await page.screenshot({ path: "test-results/confetti.png", fullPage: true });
   await page.getByRole("button", { name: "Play Again" }).click();
   await expect(page.locator("canvas")).toHaveCount(0);
-  await page.clock.runFor(10000);
+  await page.clock.runFor(12000);
   await expect(page.locator("canvas")).toHaveCount(1);
   await page.clock.runFor(8000);
   await expect(page.locator("canvas")).toHaveCount(0);
@@ -45,7 +45,8 @@ test("reduced motion skips confetti", async ({ page }) => {
   await page.getByLabel("Timer Settings").fill("3");
   await page.getByRole("button", { name: "Start Game" }).click();
   await expect(page.getByText("Sound unavailable.", { exact: false })).toBeVisible();
-  await page.clock.runFor(10000);
+  await page.clock.runFor(12000);
   await expect(page.getByRole("heading", { name: "Final Order" })).toBeVisible();
   await expect(page.locator("canvas")).toHaveCount(0);
 });
+

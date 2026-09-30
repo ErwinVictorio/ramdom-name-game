@@ -1,4 +1,4 @@
-﻿import { test, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 
 test.use({
   viewport: { width: 390, height: 844 },
@@ -76,8 +76,8 @@ test("touch activation plays one full audible clip before reveals; replay and re
   await page.getByLabel("Timer Settings").fill("3");
   await page.getByRole("button", { name: "Start Game" }).tap();
   expect(await page.evaluate(() => window.resumeGestures)).toEqual([true]);
-  expect(await page.evaluate(() => window.audioPlays.length)).toBe(0);
-  await expect(page.locator(".game-status")).toContainText("Drum roll", {
+  await expect.poll(() => page.evaluate(() => window.audioPlays.length)).toBe(1);
+  await expect(page.locator(".game-status")).toContainText("Shuffling", {
     timeout: 8000,
   });
   await expect(page.getByLabel("Names List")).toBeDisabled();
@@ -116,14 +116,14 @@ test("touch activation plays one full audible clip before reveals; replay and re
   expect(playback.plays).toBe(1);
   expect(playback.loop).toBe(false);
   await expect(page.locator(".result-grid strong")).toHaveCount(2, {
-    timeout: 5000,
+    timeout: 6500,
   });
   expect(await page.evaluate(() => window.audioPlays.length)).toBe(1);
   const interval = await page.evaluate(
     () => window.revealTimes[1] - window.revealTimes[0],
   );
-  expect(interval).toBeGreaterThanOrEqual(2900);
-  expect(interval).toBeLessThan(3500);
+  expect(interval).toBeGreaterThanOrEqual(4900);
+  expect(interval).toBeLessThan(5500);
   await page.getByRole("button", { name: "Play Again" }).tap();
   await expect
     .poll(() => page.evaluate(() => window.audioPlays.length), {
@@ -169,3 +169,17 @@ for (const failure of ["blocked", "missing"]) {
     await expect(page.locator(".result-grid strong")).toHaveCount(2);
   });
 }
+
+
+test('a completed drum roll waits for a longer shuffle to settle', async ({ page }) => {
+  await observeAudio(page);
+  await page.goto('/');
+  await page.getByLabel('Names List').fill('Ana\nBob');
+  await page.getByLabel('Timer Settings').fill('15');
+  await page.getByRole('button', { name: 'Start Game' }).tap();
+  await expect.poll(() => page.evaluate(() => window.audioPlays[0]?.endedAt || 0), { timeout: 12000 }).toBeGreaterThan(0);
+  await expect(page.locator('.game-status')).toContainText('Shuffling');
+  await expect(page.locator('.result-grid strong')).toHaveCount(0);
+  await expect(page.locator('.result-grid strong')).toHaveCount(1, { timeout: 11000 });
+  expect(await page.evaluate(() => window.audioPlays.length)).toBe(1);
+});

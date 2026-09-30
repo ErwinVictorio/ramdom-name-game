@@ -4,7 +4,7 @@ import process from "node:process";
 export default defineConfig({
   testDir: "./tests",
   testMatch: "**/*.spec.js",
-  timeout: 60000,
+  timeout: 90000,
   workers: 1,
   webServer: {
     command: `"${process.execPath}" node_modules/vite/bin/vite.js --host 127.0.0.1`,
@@ -17,3 +17,4 @@ export default defineConfig({
     channel: "chrome",
   },
 });
+

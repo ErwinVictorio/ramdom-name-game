@@ -23,7 +23,7 @@ For this workspace, a local Node runtime and npm are also available in the ignor
 
 1. Enter 2–12 unique names, one per line. Blank lines are ignored and extra whitespace is normalized. Duplicate checks ignore capitalization.
 2. Choose 3–30 whole seconds or a quick preset.
-3. Start Game shuffles the cups, slows them down, and plays the full drum roll once. After the sound ends, cups open one by one with a 3-second interval.
+3. Start Game plays the full drum roll once during shuffle. After both the sound and shuffle/settling finish, cups open one by one with a 5-second interval. Confetti appears after the final reveal.
 4. Play Again keeps the names and timer. New Game / Reset Game asks for confirmation before clearing them.
 
 Configuration is locked during play. Reset can cancel an active game; cancelling the dialog leaves it running. Refreshing the page restores the sample setup; this version does not persist results.
@@ -56,3 +56,4 @@ The supplied drum roll plays once before any cup opens. Confirmed reset stops pl
 ### Mobile audio
 
 Audio is activated through Web Audio in the Start Game / Play Again tap handler, then played after the shuffle. Browser tests cover touch input, user-gesture enforcement, and nonzero output samples; actual phone speaker output requires a device retest. After changing the source, deploy a fresh build to Vercel before testing the public URL.
+

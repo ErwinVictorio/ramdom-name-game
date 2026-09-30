@@ -46,3 +46,9 @@ The fix is local and is not deployed. Publish the updated source through the pro
 Installed `canvas-confetti` and added `useCompletionConfetti`. A single colorful burst fires 600 ms after the final reveal, allowing the cup-opening transition to finish. Mobile uses fewer particles. Replay/reset/unmount cancel the pending burst and clear existing confetti. Reduced-motion preferences disable the effect.
 
 Validation: production build, lint, 4 unit tests, and 2 focused browser tests pass. Browser checks cover no confetti before the final reveal, rendered particles, replay, cleanup, no repeat on dialog cancellation, and reduced motion. Screenshot reviewed at `test-results/confetti.png`. These changes have not been deployed.
+
+## Latest timing adjustment
+
+Drum-roll playback now starts during shuffle as soon as the clip is decoded, using the audio context activated by Start Game. It still plays once in full. The first cup opens after both the shuffle/settling and sound have finished. For a longer shuffle, completed audio does not trigger an early reveal; for a shorter shuffle, cups wait for the remaining sound. Later cups open every 5 seconds. Confetti remains after the final reveal.
+
+Latest timing validation passed: production build, ESLint, 4 unit tests, and 10 browser tests (9-test suite plus the longer-shuffle check). Tests confirm sound starts while shuffling, full audio completion gates reveals for short timers, longer timers still finish before reveal, openings are 5 seconds apart, replay/reset work, and completion confetti remains functional. Not deployed by this change.

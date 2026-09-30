@@ -69,6 +69,15 @@ export function useGame() {
       revealed: 0,
       remaining: duration,
     });
+    let settled = false;
+    let soundFinished = false;
+    function beginReveal() {
+      if (settled && soundFinished) reveal(1);
+    }
+    sound.current.play(() => {
+      soundFinished = true;
+      beginReveal();
+    });
     function reveal(count) {
       const finished = count === order.length;
       setGame((previous) => ({
@@ -78,7 +87,7 @@ export function useGame() {
       }));
       if (finished) locked.current = false;
       else {
-        later(() => reveal(count + 1), 3000);
+        later(() => reveal(count + 1), 5000);
       }
     }
     function settle(step = 0) {
@@ -88,8 +97,11 @@ export function useGame() {
           display: ids,
         }));
         later(() => {
-          setGame((previous) => ({ ...previous, phase: "drumroll" }));
-          sound.current.play(() => reveal(1));
+          settled = true;
+          if (!soundFinished) {
+            setGame((previous) => ({ ...previous, phase: "drumroll" }));
+          }
+          beginReveal();
         }, 650);
         return;
       }

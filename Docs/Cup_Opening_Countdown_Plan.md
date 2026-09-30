@@ -35,3 +35,7 @@ Replaced muted HTML audio preparation with Web Audio. The context is created/res
 Latest validation: 4 unit tests, 7 browser tests, lint, and production build pass. Tests include touch activation, user-gesture enforcement, measured audio samples, complete clip timing, and reset/replay. Physical-phone speaker output is still unverified.
 
 Live Vercel inspection confirms the old `index-Dn3AXzvJ.js` bundle remains deployed. The local fix builds `index-2QAbVfvD.js`; deployment and a phone retest are required.
+
+## Updated timing
+
+Start Game -> shuffle with one full drum roll -> wait until shuffle/settling and audio are both complete -> first cup opens -> subsequent cups every 5 seconds -> completion confetti. The selected shuffle duration is preserved; the sound is not looped or cut short.

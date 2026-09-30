@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect } from "@playwright/test";
 
 test("validates names and timer and updates cup count", async ({ page }) => {
   await page.goto("/");
@@ -46,7 +46,7 @@ test("one play reveals everyone once, then replay and reset work", async ({
   });
   const first = await page.locator(".result-grid strong").first().textContent();
   await expect(page.getByRole("heading", { name: "Final Order" })).toBeVisible({
-    timeout: 20000,
+    timeout: 30000,
   });
   const results = await page.locator(".result-grid strong").allTextContents();
   expect(results[0]).toBe(first);
@@ -112,7 +112,7 @@ test("twelve participants finish on mobile with reduced motion", async ({
   await page.getByLabel("Timer Settings").fill("3");
   await page.getByRole("button", { name: "Start Game" }).click();
   await expect(page.getByRole("heading", { name: "Final Order" })).toBeVisible({
-    timeout: 55000,
+    timeout: 75000,
   });
   expect(
     (await page.locator(".result-grid strong").allTextContents()).sort(),
@@ -132,3 +132,4 @@ test("twelve participants finish on mobile with reduced motion", async ({
   await expect(page.getByRole("dialog")).not.toBeVisible();
   await expect(page.locator(".result-grid strong")).toHaveCount(12);
 });
+
