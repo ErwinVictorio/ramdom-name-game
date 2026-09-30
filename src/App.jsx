@@ -31,7 +31,7 @@ function App() {
   const names = parseNames(input);
   const error = validateGame(names, duration);
   const phase = game.phase === "setup" && !error ? "ready" : game.phase;
-  const busy = ["shuffling", "stopping", "revealing"].includes(phase);
+  const busy = ["shuffling", "stopping", "drumroll", "revealing"].includes(phase);
   const finished = phase === "finished";
   const count = game.order.length || names.length;
   const display = game.order.length
@@ -42,6 +42,7 @@ function App() {
     ready: "Ready when you are!",
     shuffling: "Shuffling Cups...",
     stopping: "Slowing down...",
+    drumroll: "Drum roll... The cups open when the sound finishes.",
     revealing: "Revealing the order...",
     finished: "Game Complete!",
   }[phase];

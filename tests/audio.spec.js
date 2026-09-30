@@ -4,9 +4,19 @@ async function observeAudio(page, blocked = false) {
   await page.addInitScript((blocked) => {
     const NativeAudio = window.Audio;
     window.gameAudio = [];
+    window.audiblePlays = 0;
+    window.audioEndedAt = 0;
     window.Audio = function (...args) {
       const audio = new NativeAudio(...args);
       window.gameAudio.push(audio);
+      const nativePlay = audio.play.bind(audio);
+      audio.play = () => {
+        if (!audio.muted) window.audiblePlays++;
+        return nativePlay();
+      };
+      audio.addEventListener("ended", () => {
+        window.audioEndedAt = performance.now();
+      });
       if (blocked)
         audio.play = () =>
           Promise.reject(new DOMException("Blocked", "NotAllowedError"));
@@ -21,7 +31,7 @@ async function observeAudio(page, blocked = false) {
   }, blocked);
 }
 
-test("real drum roll follows the 3-second interval, ends, and cleans up on reset", async ({
+test("one full drum roll ends before reveals; replay and reset clean up audio", async ({
   page,
 }) => {
   await observeAudio(page);
@@ -32,9 +42,12 @@ test("real drum roll follows the 3-second interval, ends, and cleans up on reset
   await expect
     .poll(() => page.evaluate(() => window.gameAudio[0]?.paused))
     .toBe(true);
-  await expect(page.locator(".result-grid strong")).toHaveCount(1, {
+  await expect(page.locator(".game-status")).toContainText("Drum roll", {
     timeout: 8000,
   });
+  await expect(page.getByLabel("Names List")).toBeDisabled();
+  await expect(page.getByLabel("Timer Settings")).toBeDisabled();
+  await expect(page.locator(".result-grid strong")).toHaveCount(0);
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -43,12 +56,33 @@ test("real drum roll follows the 3-second interval, ends, and cleans up on reset
       }),
     )
     .toBe(true);
+  // The previous behavior cut the sound at three seconds; it must now keep playing.
+  await expect
+    .poll(() => page.evaluate(() => window.gameAudio[0].currentTime), {
+      timeout: 6000,
+    })
+    .toBeGreaterThan(3.2);
+  await expect(page.locator(".result-grid strong")).toHaveCount(0);
   await expect(
     page.getByText("Sound unavailable.", { exact: false }),
   ).toHaveCount(0);
+  await expect(page.locator(".result-grid strong")).toHaveCount(1, {
+    timeout: 10000,
+  });
+  const playback = await page.evaluate(() => ({
+    endedAt: window.audioEndedAt,
+    firstReveal: window.revealTimes[0],
+    plays: window.audiblePlays,
+    loop: window.gameAudio[0].loop,
+  }));
+  expect(playback.endedAt).toBeGreaterThan(0);
+  expect(playback.firstReveal).toBeGreaterThanOrEqual(playback.endedAt);
+  expect(playback.plays).toBe(1);
+  expect(playback.loop).toBe(false);
   await expect(page.locator(".result-grid strong")).toHaveCount(2, {
     timeout: 5000,
   });
+  expect(await page.evaluate(() => window.audiblePlays)).toBe(1);
   const interval = await page.evaluate(
     () => window.revealTimes[1] - window.revealTimes[0],
   );
@@ -63,7 +97,7 @@ test("real drum roll follows the 3-second interval, ends, and cleans up on reset
     )
     .toBe(true);
   await page.getByRole("button", { name: "Play Again" }).click();
-  await expect(page.locator(".result-grid strong")).toHaveCount(1, {
+  await expect(page.locator(".game-status")).toContainText("Drum roll", {
     timeout: 8000,
   });
   await expect
@@ -79,7 +113,11 @@ test("real drum roll follows the 3-second interval, ends, and cleans up on reset
     .getByRole("button", { name: "Reset Game" })
     .click();
   expect(await page.evaluate(() => window.gameAudio[0].paused)).toBe(true);
-  await page.waitForTimeout(3500);
+  // Even a stale media event after reset cannot open a cup.
+  await page.evaluate(() =>
+    window.gameAudio[0].dispatchEvent(new Event("ended")),
+  );
+  await page.waitForTimeout(9500);
   await expect(page.locator(".result-grid strong")).toHaveCount(0);
 });
 

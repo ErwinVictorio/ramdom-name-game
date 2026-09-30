@@ -42,7 +42,7 @@ test("one play reveals everyone once, then replay and reset work", async ({
     timeout: 5000,
   });
   await expect(page.locator(".result-grid strong")).toHaveCount(1, {
-    timeout: 5000,
+    timeout: 16000,
   });
   const first = await page.locator(".result-grid strong").first().textContent();
   await expect(page.getByRole("heading", { name: "Final Order" })).toBeVisible({
@@ -112,7 +112,7 @@ test("twelve participants finish on mobile with reduced motion", async ({
   await page.getByLabel("Timer Settings").fill("3");
   await page.getByRole("button", { name: "Start Game" }).click();
   await expect(page.getByRole("heading", { name: "Final Order" })).toBeVisible({
-    timeout: 45000,
+    timeout: 55000,
   });
   expect(
     (await page.locator(".result-grid strong").allTextContents()).sort(),

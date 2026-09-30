@@ -70,7 +70,6 @@ export function useGame() {
       remaining: duration,
     });
     function reveal(count) {
-      sound.current?.stop();
       const finished = count === order.length;
       setGame((previous) => ({
         ...previous,
@@ -80,17 +79,18 @@ export function useGame() {
       if (finished) locked.current = false;
       else {
         later(() => reveal(count + 1), 3000);
-        sound.current?.play();
       }
     }
     function settle(step = 0) {
       if (step === 3) {
         setGame((previous) => ({
           ...previous,
-          phase: "revealing",
           display: ids,
         }));
-        later(() => reveal(1), 650);
+        later(() => {
+          setGame((previous) => ({ ...previous, phase: "drumroll" }));
+          sound.current.play(() => reveal(1));
+        }, 650);
         return;
       }
       setGame((previous) => ({

@@ -8,6 +8,7 @@ test("audio cleanup ignores stale preparation and late playback failures", async
   const requests = [];
   let media;
   let failures = 0;
+  let completions = 0;
   globalThis.Audio = class {
     constructor() {
       media = this;
@@ -26,13 +27,15 @@ test("audio cleanup ignores stale preparation and late playback failures", async
     const player = createDrumRoll("drum.mp3", () => failures++);
     player.prepare();
     assert.equal(media.muted, true);
-    player.play();
+    player.play(() => completions++);
+    const staleEnded = media.onended;
     requests[0].resolve();
     await Promise.resolve();
     assert.equal(media.paused, false);
     assert.equal(media.muted, false);
-    assert.equal(media.loop, true);
+    assert.equal(media.loop, false);
     player.dispose();
+    staleEnded();
     requests[1].reject(new Error("late rejection after unmount"));
     await Promise.resolve();
     await Promise.resolve();
@@ -40,6 +43,7 @@ test("audio cleanup ignores stale preparation and late playback failures", async
     assert.equal(media.currentTime, 0);
     assert.equal(media.onerror, null);
     assert.equal(failures, 0);
+    assert.equal(completions, 0);
   } finally {
     if (original === undefined) delete globalThis.Audio;
     else globalThis.Audio = original;

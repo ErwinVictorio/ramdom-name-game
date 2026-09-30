@@ -23,7 +23,7 @@ For this workspace, a local Node runtime and npm are also available in the ignor
 
 1. Enter 2–12 unique names, one per line. Blank lines are ignored and extra whitespace is normalized. Duplicate checks ignore capitalization.
 2. Choose 3–30 whole seconds or a quick preset.
-3. Start Game shuffles the cups, slows them down, and reveals everyone in order automatically. A drum roll plays during the 3-second interval between cup openings.
+3. Start Game shuffles the cups, slows them down, and plays the full drum roll once. After the sound ends, cups open one by one with a 3-second interval.
 4. Play Again keeps the names and timer. New Game / Reset Game asks for confirmation before clearing them.
 
 Configuration is locked during play. Reset can cancel an active game; cancelling the dialog leaves it running. Refreshing the page restores the sample setup; this version does not persist results.
@@ -51,4 +51,4 @@ Browser tests use installed Google Chrome and start Vite automatically if needed
 
 The ranking is generated once at Start Game. Later animation changes only cup positions, never the ranking. Replay is an independent random draw and may legitimately produce the same order.
 
-The supplied drum roll restarts for each interval and stops on completion or confirmed reset. If playback fails, a message appears and the game continues silently. Saved groups, history, and exports remain future enhancements.
+The supplied drum roll plays once before any cup opens. Confirmed reset stops playback; replay starts a fresh full roll. If audio is blocked, fails, or stalls, a message appears and reveals continue silently. Saved groups, history, and exports remain future enhancements.
