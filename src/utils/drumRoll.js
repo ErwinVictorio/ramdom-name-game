@@ -34,7 +34,7 @@ export function createDrumRoll(source, onUnavailable) {
       loadTimer = setTimeout(() => loadController.abort(), 15000);
       loading = fetch(source, { signal: loadController.signal })
         .then((response) => {
-          if (!response.ok) throw new Error("Unable to load drum roll");
+          if (!response.ok) throw new Error("Unable to load sound effect");
           return response.arrayBuffer();
         })
         .then((data) => context.decodeAudioData(data))

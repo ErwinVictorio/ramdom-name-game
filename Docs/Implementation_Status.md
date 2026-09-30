@@ -52,3 +52,11 @@ Validation: production build, lint, 4 unit tests, and 2 focused browser tests pa
 Drum-roll playback now starts during shuffle as soon as the clip is decoded, using the audio context activated by Start Game. It still plays once in full. The first cup opens after both the shuffle/settling and sound have finished. For a longer shuffle, completed audio does not trigger an early reveal; for a shorter shuffle, cups wait for the remaining sound. Later cups open every 5 seconds. Confetti remains after the final reveal.
 
 Latest timing validation passed: production build, ESLint, 4 unit tests, and 10 browser tests (9-test suite plus the longer-shuffle check). Tests confirm sound starts while shuffling, full audio completion gates reveals for short timers, longer timers still finish before reveal, openings are 5 seconds apart, replay/reset work, and completion confetti remains functional. Not deployed by this change.
+
+## Sound on each cup opening
+
+Added `CORRECT ANSWER SOUND EFFECT NO COPYRIGHT.mp3` to every reveal trigger, including the first and final cup. Browser decoding reports a 4.60-second clip, which fits the existing 5-second interval. The sound is non-looping and does not control or delay reveals. It is prepared during Start Game / Play Again using the same Web Audio helper as the drum roll, with both contexts activated in the user gesture.
+
+Reset, replay, and unmount stop the opening effect and invalidate pending playback. A failed effect shows the existing sound notice without blocking the game. The original MP3 is unchanged; drum-roll timing and completion confetti are preserved.
+
+Verification: build, lint, 4 unit tests, and 5 audio browser tests pass. Tests measure nonzero opening-sound samples, check one playback per reveal including the final cup, preserve the 5-second interval, verify both contexts resume within the tap gesture, and cover replay, reset during opening sound, blocked/missing audio, and longer shuffle timing. Actual phone speaker output remains unverified. Not deployed.

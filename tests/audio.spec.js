@@ -10,7 +10,7 @@ async function observeAudio(page, blocked = false) {
   await page.addInitScript((blocked) => {
     const NativeContext = window.AudioContext;
     window.audioContexts = [];
-    window.audioPlays = [];
+    window.audioPlays = []; window.revealPlays = [];
     window.resumeGestures = [];
     window.AudioContext = class extends NativeContext {
       constructor(...args) {
@@ -39,7 +39,7 @@ async function observeAudio(page, blocked = false) {
         const stop = source.stop.bind(source);
         source.start = (...args) => {
           record.startedAt = performance.now();
-          window.audioPlays.push(record);
+          if (this === window.audioContexts[0]) window.audioPlays.push(record); else window.revealPlays.push(record);
           return start(...args);
         };
         source.stop = (...args) => {
@@ -75,7 +75,7 @@ test("touch activation plays one full audible clip before reveals; replay and re
   await page.getByLabel("Names List").fill("Ana\nBob");
   await page.getByLabel("Timer Settings").fill("3");
   await page.getByRole("button", { name: "Start Game" }).tap();
-  expect(await page.evaluate(() => window.resumeGestures)).toEqual([true]);
+  expect(await page.evaluate(() => window.resumeGestures)).toEqual([true, true]);
   await expect.poll(() => page.evaluate(() => window.audioPlays.length)).toBe(1);
   await expect(page.locator(".game-status")).toContainText("Shuffling", {
     timeout: 8000,
@@ -115,6 +115,13 @@ test("touch activation plays one full audible clip before reveals; replay and re
   expect(playback.firstReveal).toBeGreaterThanOrEqual(playback.endedAt);
   expect(playback.plays).toBe(1);
   expect(playback.loop).toBe(false);
+  await expect.poll(() => page.evaluate(() => window.revealPlays.length)).toBe(1);
+  await expect.poll(() => page.evaluate(() => {
+    const record = window.revealPlays[0];
+    const samples = new Float32Array(record.analyser.fftSize);
+    record.analyser.getFloatTimeDomainData(samples);
+    return Math.max(...samples.map(Math.abs));
+  })).toBeGreaterThan(0.001);
   await expect(page.locator(".result-grid strong")).toHaveCount(2, {
     timeout: 6500,
   });
@@ -124,14 +131,28 @@ test("touch activation plays one full audible clip before reveals; replay and re
   );
   expect(interval).toBeGreaterThanOrEqual(4900);
   expect(interval).toBeLessThan(5500);
+  await expect.poll(() => page.evaluate(() => window.revealPlays.length)).toBe(2);
+  const revealSounds = await page.evaluate(() => window.revealPlays.map((record, i) => ({
+    difference: Math.abs(record.startedAt - window.revealTimes[i]),
+    loop: record.source.loop,
+    duration: record.source.buffer.duration,
+  })));
+  for (const effect of revealSounds) {
+    expect(effect.difference).toBeLessThan(300);
+    expect(effect.loop).toBe(false);
+  }
+  console.log('Opening sound duration:', revealSounds[0].duration);
   await page.getByRole("button", { name: "Play Again" }).tap();
+  expect(await page.evaluate(() => window.revealPlays.every(record => record.stopped))).toBe(true);
   await expect
     .poll(() => page.evaluate(() => window.audioPlays.length), {
       timeout: 8000,
     })
     .toBe(2);
-  expect(await page.evaluate(() => window.audioContexts.length)).toBe(1);
+  expect(await page.evaluate(() => window.audioContexts.length)).toBe(2);
   expect(await page.evaluate(() => window.resumeGestures)).toEqual([
+    true,
+    true,
     true,
     true,
   ]);
@@ -182,4 +203,21 @@ test('a completed drum roll waits for a longer shuffle to settle', async ({ page
   await expect(page.locator('.result-grid strong')).toHaveCount(0);
   await expect(page.locator('.result-grid strong')).toHaveCount(1, { timeout: 11000 });
   expect(await page.evaluate(() => window.audioPlays.length)).toBe(1);
+});
+
+
+test('confirmed reset stops the opening effect and prevents later cups', async ({ page }) => {
+  await observeAudio(page);
+  await page.route('**/*Drum*mp3', route => route.abort());
+  await page.goto('/');
+  await page.getByLabel('Names List').fill('Ana\nBob');
+  await page.getByLabel('Timer Settings').fill('3');
+  await page.getByRole('button', { name: 'Start Game' }).tap();
+  await expect.poll(() => page.evaluate(() => window.revealPlays.length), { timeout: 8000 }).toBe(1);
+  await page.getByRole('button', { name: 'Reset Game', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Reset Game' }).click();
+  expect(await page.evaluate(() => window.revealPlays[0].stopped)).toBe(true);
+  await page.waitForTimeout(5500);
+  await expect(page.locator('.result-grid strong')).toHaveCount(0);
+  expect(await page.evaluate(() => window.revealPlays.length)).toBe(1);
 });

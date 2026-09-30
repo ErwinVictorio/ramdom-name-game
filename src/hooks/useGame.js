@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { shuffleArray } from "../utils/game";
 import { createDrumRoll } from "../utils/drumRoll";
 import drumRollSource from "../assets/Sound/Drum roll sound effect.mp3";
+import revealSoundSource from "../assets/Sound/CORRECT ANSWER SOUND EFFECT NO COPYRIGHT.mp3";
 
 export function useGame() {
   const [game, setGame] = useState({
@@ -13,6 +14,7 @@ export function useGame() {
   });
   const timers = useRef(new Set());
   const sound = useRef(null);
+  const revealSound = useRef(null);
   const [soundUnavailable, setSoundUnavailable] = useState(false);
   const locked = useRef(false);
   function clearTimers() {
@@ -25,6 +27,8 @@ export function useGame() {
       pending.forEach(clearTimeout);
       sound.current?.dispose();
       sound.current = null;
+      revealSound.current?.dispose();
+      revealSound.current = null;
     };
   }, []);
   function later(callback, delay) {
@@ -37,6 +41,7 @@ export function useGame() {
   function reset() {
     clearTimers();
     sound.current?.stop();
+    revealSound.current?.stop();
     setSoundUnavailable(false);
     locked.current = false;
     setGame({
@@ -57,6 +62,13 @@ export function useGame() {
       );
     }
     sound.current.prepare();
+    if (!revealSound.current) {
+      revealSound.current = createDrumRoll(revealSoundSource, () =>
+        setSoundUnavailable(true),
+      );
+    }
+    // Activate both contexts in the same user gesture for mobile playback.
+    revealSound.current.prepare();
     locked.current = true;
     // Generate the ranking once; visual shuffling only changes the cup IDs.
     const order = shuffleArray(names);
@@ -79,6 +91,7 @@ export function useGame() {
       beginReveal();
     });
     function reveal(count) {
+      revealSound.current.play();
       const finished = count === order.length;
       setGame((previous) => ({
         ...previous,

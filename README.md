@@ -57,3 +57,5 @@ The supplied drum roll plays once before any cup opens. Confirmed reset stops pl
 
 Audio is activated through Web Audio in the Start Game / Play Again tap handler, then played after the shuffle. Browser tests cover touch input, user-gesture enforcement, and nonzero output samples; actual phone speaker output requires a device retest. After changing the source, deploy a fresh build to Vercel before testing the public URL.
 
+
+Each cup opening now plays the supplied correct-answer sound once (approximately 4.6 seconds). It fits the 5-second reveal interval and is stopped by reset or replay. Both sounds are prepared from the Start Game tap for mobile playback.

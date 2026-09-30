@@ -183,7 +183,7 @@ function App() {
       </p>
       {soundUnavailable && (
         <p className="validation has-error" role="status">
-          Sound unavailable. The game will continue without audio.
+          Sound unavailable. One or more sound effects could not play. The game will continue.
         </p>
       )}
       <section
